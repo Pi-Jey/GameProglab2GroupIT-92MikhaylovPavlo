@@ -1,73 +1,78 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class PlayerMove : MonoBehaviour
 {
-    public float Speed = 10;
+    [SerializeField] private float Speed = 10;
+    [SerializeField] private float JumpForce = 200;
+    
+    private bool IsPlayerOnGround = true;
     private Rigidbody rb;
-    public float JumpForce = 200;
-    private bool IsPlayerOnGround;
-
-    // Start is called before the first frame update
-    void Start()
+    private const float positionToLose = -5f;
+    
+    private void Awake()
     {
         rb = GetComponent<Rigidbody>();
     }
-
-    // Update is called once per frame
-    void Update()
+    
+    private void Update()
     {
-        //Move
-        var dir = new Vector3(
-            Input.GetAxis("Horizontal"),
-            0,
-            Input.GetAxis("Vertical")) * Speed;
+        Movement();
+        Jump();
+        CheckLoseCondition();
+    }
 
-        dir.y = rb.velocity.y;
-        rb.velocity = dir;
+    private void CheckLoseCondition()
+    {
+        if (transform.position.y < positionToLose)
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
+    }
+    private void Movement()
+    {
+        var horizontal = Input.GetAxis("Horizontal");
+        var vertical = Input.GetAxis("Vertical");
+        var direction = new Vector3(horizontal, 0f, vertical) * Speed;
+        direction.y = rb.velocity.y;
+        rb.velocity = direction;
+    }
 
-        //Jump
-        if (Input.GetKeyDown(KeyCode.Space)
-            && IsPlayerOnGround)
+    private void Jump()
+    {
+        if (Input.GetKeyDown(KeyCode.Space) && IsPlayerOnGround)
         {
             rb.AddForce(Vector3.up * JumpForce);
-        }
-
-        var playerObject = GameObject.Find("Sphere");
-        var playerPos = playerObject.transform.position;
-        if (playerPos.y < -5)
-        {
-            SceneManager.LoadScene("First Scene");
+            IsPlayerOnGround = false;
         }
     }
+    
 
-    private void OnCollisionStay(Collision collision)
+    private void OnCollisionEnter(Collision other)
     {
-        if (collision.gameObject.tag == "Plate")
+        if (other.transform.CompareTag("Portal"))
+        {
+            if (ScoreUI.Instance.CanGoToPortal())
+            {
+                if (SceneManager.GetActiveScene().buildIndex == SceneManager.sceneCountInBuildSettings - 1)
+                    SceneManager.LoadScene(0);
+                else SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+            }
+            else
+            {
+                ScoreUI.Instance.ShowNotEnough();
+            }
+        }
+        else if (other.transform.CompareTag("Plate"))
         {
             IsPlayerOnGround = true;
-
         }
-
-    }
-
-    private void OnCollisionExit(Collision collision)
-    {
-        if (collision.gameObject.tag == "Plate")
+        else if (other.transform.CompareTag("Coin"))
         {
-            IsPlayerOnGround = false;
-
-        } 
-    }
-
-    private void OnCollisionEnter(Collision collision)
-    {
-        if (collision.gameObject.tag == "Portal")
-        {
-            SceneManager.LoadScene("Second Scene");
+            ScoreUI.Instance.OnCoinPickUp();
+            Destroy(other.gameObject);
         }
     }
 }
